@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cabin Announcement Manager PRO</title>
+
+<style>
+*{
+box-sizing:border-box;
+}
+
+body{
+margin:0;
+font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto;
+background:#0b1a2a;
+color:white;
+display:flex;
+flex-direction:column;
+height:100vh;
+}
+
+header{
+padding:15px;
+text-align:center;
+background:#07121c;
+font-weight:600;
+font-size:16px;
+position:sticky;
+top:0;
+z-index:10;
+}
+
+.container{
+flex:1;
+overflow-y:auto;
+padding:15px;
+padding-bottom:140px;
+}
+
+input, select{
+width:100%;
+padding:14px;
+margin:6px 0;
+border-radius:10px;
+border:none;
+font-size:16px;
+}
+
+.section{
+margin-top:15px;
+}
+
+label{
+display:block;
+margin:6px 0;
+font-size:15px;
+}
+
+button{
+width:100%;
+padding:16px;
+border:none;
+border-radius:12px;
+font-weight:600;
+font-size:16px;
+cursor:pointer;
+}
+
+.primary{
+background:#27d1ff;
+color:black;
+margin-top:10px;
+}
+
+.optional{
+background:#ffffff10;
+border:1px solid #ffffff30;
+color:white;
+margin-top:8px;
+}
+
+.announcement{
+background:white;
+color:black;
+padding:20px;
+border-radius:14px;
+margin-top:15px;
+white-space:pre-wrap;
+font-size:14px;
+line-height:1.4;
+min-height:250px;
+}
+
+.bottom-bar{
+position:fixed;
+bottom:0;
+left:0;
+right:0;
+background:#07121c;
+padding:12px;
+display:flex;
+gap:10px;
+box-shadow:0 -4px 20px rgba(0,0,0,0.5);
+}
+
+.bottom-bar button{
+flex:1;
+background:#12324d;
+color:white;
+padding:14px;
+border-radius:12px;
+font-size:18px;
+}
+
+@media (min-width:768px){
+.container{
+max-width:700px;
+margin:auto;
+}
+}
+</style>
+</head>
+
+<body>
+
+<header>✈ Cabin Announcement Manager PRO</header>
+
+<div class="container">
+<input type="text" id="flightNumberAPI" placeholder="Numéro de vol pour API">
+<button class="optional" onclick="fetchFlightData(document.getElementById('flightNumberAPI').value)">
+  Chercher par API
+</button>
+<input id="destination" placeholder="Destination">
+<input id="aircraft" placeholder="Type d'avion">
+<input id="temperature" placeholder="Température à destination">
+<input id="flightTime" placeholder="Temps de vol">
+<input id="arrivalTime" type="time">
+<input id="chef" placeholder="Nom du chef de cabine">
+
+<div class="section">
+<strong>Sorties :</strong>
+<label><input type="checkbox" value="l’avant"> Avant</label>
+<label><input type="checkbox" value="le milieu"> Milieu</label>
+<label><input type="checkbox" value="l’arrière"> Arrière</label>
+</div>
+
+<button class="primary" onclick="start()">Démarrer les annonces obligatoires</button>
+<select id="announcementSelect" onchange="jumpTo(this.value)" style="margin-top:10px;padding:10px;border-radius:8px;border:none;width:100%;">
+<option value="">Aller à une annonce obligatoire…</option>
+</select>
+<div class="announcement" id="announcement"></div>
+
+<div class="nav">
+<button onclick="prev()">⬅</button>
+<button onclick="next()">➡</button>
+</div>
+
+<div class="section">
+<strong>Annonces facultatives</strong>
+<button class="optional" onclick="optional('turbulence')">Annonce turbulences</button>
+<button class="optional" onclick="optional('desinfection')">Annonce désinfection cabine</button>
+</div>
+
+</div>
+
+<script>
+
+let mandatory=[];
+let index=0;
+
+function momentFR(time){
+if(!time) return "journée";
+let h=parseInt(time.split(":")[0]);
+if(h>=5 && h<18) return "journée";
+if(h>=18 && h<22) return "soirée";
+return "nuit";
+}
+
+function momentEN(time){
+if(!time) return "day";
+let h=parseInt(time.split(":")[0]);
+if(h>=5 && h<18) return "day";
+if(h>=18 && h<22) return "evening";
+return "night";
+}
+async function fetchFlightData(flightNumber) {
+  const apiKey = "29d28aca1b8e7b3e03bea68cfb7462c4"; 
+  const url = `https://api.aviationstack.com/v1/flights?access_key=${apiKey}&flight_iata=${flightNumber}`;
+
+  try {
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (data && data.data && data.data.length > 0) {
+      const flight = data.data[0];
+      // exemple de récupération
+      document.getElementById("destination").value = flight.arrival.airport;
+      document.getElementById("aircraft").value = flight.aircraft.iata || "";
+      document.getElementById("flightTime").value = `${flight.departure.estimated}-${flight.arrival.estimated}`;
+      document.getElementById("arrivalTime").value = flight.arrival.estimated.slice(11,16);
+      // Tu peux ajouter plus de champs selon ce que retourne l’API
+    } else {
+      alert("Vol non trouvé ou données indisponibles");
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Erreur lors de la requête API");
+  }
+}
+function exitsSelected(){
+let selected=[];
+document.querySelectorAll("input[type=checkbox]:checked")
+.forEach(e=>selected.push(e.value));
+return selected.join(", ");
+}
+
+function start(){
+
+let d=destination.value;
+let a=aircraft.value;
+let t=temperature.value;
+let f=flightTime.value;
+let time=arrivalTime.value;
+let c=chef.value;
+let exits=exitsSelected();
+let mFR=momentFR(time);
+let mEN=momentEN(time);
+
+mandatory=[
+`Accueil pendant embarquement
+Mesdames, Messieurs, bienvenue dans cet ${a} à destination de ${d}.
+Afin de fluidifier l’embarquement, nous vous prions de respecter le numéro de siège inscrit sur votre carte d’embarquement.
+Nous vous rappelons que tous vos bagages cabines doivent être rangés dans les coffres à bagages et que vos bagages à main doivent être placés sous le siège devant vous.
+Veuillez noter que les issues de secours doivent rester dégagées.
+
+Reception during boarding
+Ladies and gentlemen, welcome aboard this ${a} bound for ${d}.
+In order to facilitate boarding, please respect the seat number indicated on your boarding pass.
+We remind you that all cabin baggage must be stored in the overhead lockers and that hand luggage must be placed under the seat in front of you.
+Please note that emergency exits must remain clear.
+
+À l’attention de l’équipage, embarquement terminé`,
+
+`Accueil passager
+Mesdames, Messieurs bonjour, je suis ${c}, votre chef de cabine. Au nom de tout l’équipage, au nom d’Air France KLM et de tous ses partenaires, bienvenue dans cet ${a} à destination de ${d}. Il fait actuellement ${t} degrés à ${d}. Notre temps de vol devrait être de ${f}. Nous vous rappelons que vos bagages cabines doivent être rangés dans les coffres à bagage et que vos bagages à main doivent être placés sous le siège devant vous.
+Air France KLM et tout ses partenaires vous souhaitent un excellent vol !
+L’embarquement est désormais terminé, dans quelques minutes nous nous envolerons pour ${d}.
+
+Passenger reception
+Ladies and gentlemen, hello, I am ${c}, your cabin crew manager. On behalf of the entire crew, Air France KLM and all its partners, welcome aboard this ${a} bound for ${d}. The current temperature at ${d} is ${t} degrees. Our flight time is expected to be ${f}. We remind you that your cabin baggage must be stored in the overhead lockers and that your hand luggage must be placed under the seat in front of you.
+Air France KLM and all its partners wish you a pleasant flight!
+Boarding is now complete, and in a few minutes we will be taking off for ${d}.`,
+
+`Annonce pré-decollage
+Mesdames, Messieurs, notre décollage est imminent, veuillez repliez toutes les tablettes et portes- gobelets et ouvrir tous les cache-hublots. Nous vous prions d’activer le mode avion ou d’éteindre vos appareils électroniques et de débrancher tous les appareils électronique de prises USB. Seul le Wifi et le Bluetooth peuvent rester activer. Nous vous rappelons que cet avion est non-fumeur. L’utilisation et la recharge de la cigarette électronique est interdite et est passible d’une amende.
+Nous vous rappelons que la recharge de batteries externes est interdite dans l’appareil. Ces batteries doivent être hors des coffres à bagages, accessibles à tout moment.
+
+Pre-take-off announcement
+Ladies and gentlemen, our take-off is imminent. Please stow all tray tables and cup holders and open all window shades. Please activate airplane mode or switch off your electronic devices and disconnect all electronic devices from USB ports. Only Wi-Fi and Bluetooth may remain activated. We remind you that this aircraft is non-smoking. The use and recharging of electronic cigarettes is prohibited and is punishable by a fine.
+We remind you that recharging external batteries is prohibited on board the aircraft. These batteries must be out of the luggage compartments, accessible at all times.`,
+
+`PNC armement des tobogans	
+Vérification de la porte opposée`,
+
+`Préannonce consignes sécurité
+Mesdames, Messieurs, votre attention s’il vous plait, veuillez retirer vos écouteurs, les démonstrations de sécurité vont commencer.
+
+Pre-announcement safety instructions
+Ladies and gentlemen, your attention please. Please remove your headphones. The safety demonstrations are about to begin.`,
+
+`Annonce sécurité
+Les ceintures de sécurité s’attachent et se détachent de cette façon. Veuillez garder votre ceinture attachée avant l’extinction de la consigne lumineuse, durant les phases de roulage, de décollage, d’approche et d’atterrissage. Nous vous demandons de laisser votre ceinture visible afin de faciliter les contrôles.
+
+Security Announcement
+Seat belts are fastened and unfastened in this manner. Please keep your seat belt fastened until the seat belt sign is turned off, during taxiing, take-off, approach and landing. We ask that you leave your seat belt visible to facilitate checks.
+
+Mesdames, Messieurs, nous vous informons que les personnels navigants munis d’un insigne rouge sont là pour votre sécurité. Si vous rencontrez un problème durant votre  vol, n’hésitez pas à vous rapprocher d’eux.
+Ladies and gentlemen, please note that flight attendants wearing red badges are there for your safety. If you encounter any problems during your flight, please do not hesitate to contact them.
+
+Votre gilet de sauvetage se situe sous votre siège. En cas d’urgences, passez la tête dans l’alcove prévue à cet effet, fermez la sangle et tirez sur la manette rouge pour gonfler votre gilet.
+Your life jacket is located under your seat. In case of emergency, place your head in the alcove provided, close the strap and pull the red handle to inflate your life jacket.
+
+Les sorties de secours sont signalées par des panneaux lumineux, veuillez repérer le plus proche de vous, il peut se situer derrière vous.
+Emergency exits are marked with illuminated signs. Please locate the one closest to you, which may be behind you.
+
+En cas d’évacuation, suivez le marquage lumineux jusqu’aux issues de secours et laissez tous vos bagages.
+Les issues de secours se trouvent :
+-A l’avant,
+-Au milieu,
+-Et à l’arrière de l’appareil.
+In the event of an evacuation, follow the illuminated signs to the emergency exits and leave all your luggage behind.
+The emergency exits are located:
+-At the front,
+-In the middle,
+-And at the back of the aircraft.
+
+En cas de dépressurisation, un masque à oxygène tombera automatiquement au-dessus de votre tête, tirez sur le masque pour libérer l’oxygène, retirez votre masque de protection et appliquez le masque à oxygène sur votre visage, il doit recouvrir la bouche et le nez. Une fois votre masque appliqué, il vous sera possible d’aider d’autres personnes à appliquer le leur.
+In the event of depressurisation, an oxygen mask will automatically drop down above your head. Pull the mask down to release the oxygen, remove your protective mask and place the oxygen mask over your face, covering your mouth and nose. Once you have put on your mask, you can help others to put on theirs.
+
+Les tablettes et portes-gobelets doivent être fermés  et tous les caches-hublots ouverts durant les phases de roulage, de décollage, d’approche et d’atterrissage.
+Tables and cup holders must be stowed away and all window shades must be open during taxiing, take-off, approach and landing.
+
+Nous vous prions de lire le dépliant situé devant vous, il contient toutes les consignes en cas d’évacuation.
+Please read the leaflet in front of you, which contains all the instructions in case of evacuation.
+
+Nous vous rappelons qu’en cas d’évacuation, vous devez laisser tout vos bagages.
+We remind you that in case of evacuation, you must leave all your luggage behind.`,
+`Annonce désinfection cabine
+Mesdames, messieurs, en application des règles d’hygiène nationales et internationales, la cabine va être désinfectée. Le produit utilisé remplit toutes les règles d’hygiène, et n’est pas nocif. Nous vous prions de rester assis pendant la désinfection.
+
+Cabin disinfection notice
+Ladies and gentlemen, in accordance with national and international hygiene regulations, the cabin will now be disinfected. The product used complies with all hygiene regulations and is not harmful. Please remain seated during the disinfection process.`,
+
+`Annonce fin phase décollage
+Mesdames, Messieurs, vous pouvez désormais détacher votre ceinture et vous déplacer dans l’appareil, nous vous recommandons cependant de garder votre ceinture attachée.
+Nous vous rappelons que cet avion est non-fumeur, la recharge et l’utilisation de la cigarette électronique est interdite.
+En cas d’évacuation, laissez tous vos bagages.
+
+End of take-off phase announcement
+Ladies and gentlemen, you may now unfasten your seat belts and move around the aircraft, although we recommend that you keep your seat belts fastened.
+We remind you that this is a non-smoking aircraft and that charging and using electronic cigarettes is prohibited.
+In the event of an evacuation, please leave all your luggage behind.`,
+
+`Annonce atterrissage
+Mesdames, Messieurs, nous approchons de notre destination, nous vous demandons de retourner à votre place et d’attacher votre ceinture.
+Toutes le tablettes et tous les porte-gobelets doivent être fermées. Tous les caches-hublots doivent être ouverts.
+Nous vous rappelons qu’en cas d’évacuation, vous devez laisser tous vos bagages.
+Toutes les consignes en cas d’évacuation se situent dans le dépliant situé devant vous.
+
+Landing announcement
+Ladies and gentlemen, we are approaching our destination. Please return to your seats and fasten your seat belts.
+All tray tables and cup holders must be stowed. All window shades must be opened.
+We remind you that in the event of an evacuation, you must leave all your luggage behind.
+All evacuation instructions can be found in the leaflet in front of you.`,
+
+`Annonce fin de voyage
+Mesdames, Messieurs, bienvenue à ${d}. Il est ${time} et il fait actuellement ${t} degrés.
+Nous espérons que vous avez passé un agréable voyage, au nom d’Air France KLM et de tous ses partenaires, nous vous souhaitons une excellente ${mFR}.
+Veuillez garder votre ceinture attachée jusqu’à l’extinction de la consigne lumineuse. Soyez vigilants à la chute d’objets lors de l’ouverture des coffres à bagages.
+
+End of trip announcement
+Ladies and gentlemen, welcome to ${d}. It is ${time} and the current temperature is ${t} degrees.
+We hope you had a pleasant trip, on behalf of Air France KLM and all its partners, we wish you an excellent ${mEN}.
+Please keep your seat belt fastened until the set point goes out.
+Be vigilant when objects fall when opening luggage compartments.`,
+
+`PNC désarmement des tobogans	
+Vérification de la porte opposé`,
+
+`Dernière annonce
+Mesdames messieurs, au nom d’Air France KLM et de tout ses partenaires, nous sommes ravis d’avoir effectué ce trajet avec vous. Nous espérons que vous avez apprécié votre voyage, et espérons vous revoir bientôt à bord ! Nous vous souhaitons une excellente ${mFR} à ${d} !
+Vous pouvez désormais vous détacher. La sortie s’effectuera par ${exits}.
+
+Last announcement
+Ladies and gentlemen, on behalf of Air France KLM and all its partners, we are delighted to have flown with you today. We hope you enjoyed your journey and look forward to seeing you again soon! We wish you a wonderful ${mEN} in ${d}!
+You may now unbuckle your seat belts. The exit will be via ${exits}.`
+];
+populateDropdown();
+
+index=0;
+show();
+}
+
+function populateDropdown(){
+let select=document.getElementById("announcementSelect");
+select.innerHTML='<option value="">Aller à une annonce obligatoire…</option>';
+
+mandatory.forEach((ann,index)=>{
+let title=ann.split('\n')[0];
+let option=document.createElement("option");
+option.value=index;
+option.textContent=(index+1)+" - "+title;
+select.appendChild(option);
+});
+}
+
+function jumpTo(i){
+if(i==="") return;
+index=parseInt(i);
+show();
+document.getElementById("announcementSelect").value=i;
+}
+
+function show(){
+document.getElementById("announcement").innerText = mandatory[index];
+document.getElementById("announcementSelect").value = index;
+}
+
+function next(){
+if(index < mandatory.length-1){
+index++;
+show();
+}
+}
+
+function prev(){
+if(index > 0){
+index--;
+show();
+}
+}
+
+function optional(type){
+
+if(type==="turbulence"){
+document.getElementById("announcement").innerText =
+`Annonce turbulences
+Mesdames, messieurs, le commandant de bord vous informe que nous allons entre dans une zone de turbulences et vous demande de vous rasseoir et de rattacher vos ceintures.
+Nous vous rappelons qu’en cas d’évacuation, vous devez laisser tous vos bagages.
+
+Turbulence announcement
+Ladies and gentlemen, the captain informs you that we are entering an area of turbulence and asks you to sit down and fasten your seat belts.
+We remind you that in case of evacuation, you must leave all your luggage.`;
+}
+
+if(type==="desinfection"){
+document.getElementById("announcement").innerText =
+`Annonce désinfection cabine
+Mesdames, messieurs, en application des règles d’hygiène nationales et internationales, la cabine va être désinfectée. Le produit utilisé remplit toutes les règles d’hygiène, et n’est pas nocif. Nous vous prions de rester assis pendant la désinfection.
+
+Cabin disinfection notice
+Ladies and gentlemen, in accordance with national and international hygiene regulations, the cabin will now be disinfected. The product used complies with all hygiene regulations and is not harmful. Please remain seated during the disinfection process.`;
+}
+
+}
+
+</script>
+</body>
+</html>
