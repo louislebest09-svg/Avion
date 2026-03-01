@@ -137,7 +137,6 @@ margin:auto;
 <input id="flightTime" placeholder="Temps de vol">
 <input id="arrivalTime" type="time">
 <input id="chef" placeholder="Nom du chef de cabine">
-
 <div class="section">
 <strong>Sorties :</strong>
 <label><input type="checkbox" value="l’avant"> Avant</label>
@@ -185,47 +184,58 @@ if(h>=18 && h<22) return "evening";
 return "night";
 }
 async function fetchFlightData(flightNumber) {
-  const apiKey = "TA_CLE_API_ICI";
-  const url = `https://api.aviationstack.com/v1/flights?access_key=${apiKey}&flight_iata=${flightNumber}`;
+
+  if (!flightNumber) {
+    alert("Veuillez entrer un numéro de vol");
+    return;
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const oneHourAgo = now - 3600;
+
+  const url = `https://opensky-network.org/api/flights/all?begin=${oneHourAgo}&end=${now}`;
 
   try {
+
     const response = await fetch(url);
     const data = await response.json();
 
-    if (data?.data?.length > 0) {
-      const flight = data.data[0];
+    // OpenSky utilise callsign (ex: AFR123)
+    const formattedFlight = flightNumber.toUpperCase().replace(" ", "");
 
-      // Destination
+    const flight = data.find(f =>
+      f.callsign && f.callsign.trim().includes(formattedFlight)
+    );
+
+    if (flight) {
+
       document.getElementById("destination").value =
-        flight.arrival?.airport || "";
+        flight.estArrivalAirport || "Destination inconnue";
 
-      // Aircraft
       document.getElementById("aircraft").value =
-        flight.aircraft?.iata || flight.aircraft?.icao || "";
+        flight.icao24 || "Type inconnu";
 
-      // Flight time estimé
-      document.getElementById("flightTime").value =
-        flight.departure?.estimated && flight.arrival?.estimated
-          ? flight.departure.estimated + " → " + flight.arrival.estimated
-          : "";
-
-      // Heure d’arrivée (format HH:MM propre)
-      if (flight.arrival?.estimated) {
-        const date = new Date(flight.arrival.estimated);
+      if (flight.lastSeen) {
+        const date = new Date(flight.lastSeen * 1000);
         const hours = String(date.getHours()).padStart(2, "0");
         const minutes = String(date.getMinutes()).padStart(2, "0");
-        document.getElementById("arrivalTime").value = `${hours}:${minutes}`;
-      } else {
-        document.getElementById("arrivalTime").value = "";
+        document.getElementById("arrivalTime").value =
+          `${hours}:${minutes}`;
       }
 
+      document.getElementById("announcement").innerText =
+        "Vol trouvé via OpenSky ✅";
+
     } else {
-      alert("Vol non trouvé ou données indisponibles");
+      document.getElementById("announcement").innerText =
+        "Vol non trouvé dans la dernière heure.";
     }
 
   } catch (err) {
-    console.error("Erreur API :", err);
-    alert("Erreur lors de la requête API");
+
+    document.getElementById("announcement").innerText =
+      "Erreur OpenSky : " + err;
+
   }
 }
 function exitsSelected(){
