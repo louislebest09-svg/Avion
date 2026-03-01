@@ -185,26 +185,46 @@ if(h>=18 && h<22) return "evening";
 return "night";
 }
 async function fetchFlightData(flightNumber) {
-  const apiKey = "29d28aca1b8e7b3e03bea68cfb7462c4"; 
+  const apiKey = "TA_CLE_API_ICI";
   const url = `https://api.aviationstack.com/v1/flights?access_key=${apiKey}&flight_iata=${flightNumber}`;
 
   try {
     const response = await fetch(url);
     const data = await response.json();
 
-    if (data && data.data && data.data.length > 0) {
+    if (data?.data?.length > 0) {
       const flight = data.data[0];
-      // exemple de récupération
-      document.getElementById("destination").value = flight.arrival.airport;
-      document.getElementById("aircraft").value = flight.aircraft.iata || "";
-      document.getElementById("flightTime").value = `${flight.departure.estimated}-${flight.arrival.estimated}`;
-      document.getElementById("arrivalTime").value = flight.arrival.estimated.slice(11,16);
-      // Tu peux ajouter plus de champs selon ce que retourne l’API
+
+      // Destination
+      document.getElementById("destination").value =
+        flight.arrival?.airport || "";
+
+      // Aircraft
+      document.getElementById("aircraft").value =
+        flight.aircraft?.iata || flight.aircraft?.icao || "";
+
+      // Flight time estimé
+      document.getElementById("flightTime").value =
+        flight.departure?.estimated && flight.arrival?.estimated
+          ? flight.departure.estimated + " → " + flight.arrival.estimated
+          : "";
+
+      // Heure d’arrivée (format HH:MM propre)
+      if (flight.arrival?.estimated) {
+        const date = new Date(flight.arrival.estimated);
+        const hours = String(date.getHours()).padStart(2, "0");
+        const minutes = String(date.getMinutes()).padStart(2, "0");
+        document.getElementById("arrivalTime").value = `${hours}:${minutes}`;
+      } else {
+        document.getElementById("arrivalTime").value = "";
+      }
+
     } else {
       alert("Vol non trouvé ou données indisponibles");
     }
+
   } catch (err) {
-    console.error(err);
+    console.error("Erreur API :", err);
     alert("Erreur lors de la requête API");
   }
 }
